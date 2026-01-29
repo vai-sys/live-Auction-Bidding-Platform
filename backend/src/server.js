@@ -11,61 +11,45 @@ const startAuctionFinalizer = require("./services/auctionFinalizer.service");
 
 async function startServer() {
   try {
+    
     await mongoose.connect(env.MONGO_URI);
+    console.log("MongoDB connected");
+
   
-
     const items = await upsertItems();
-   
+    console.log("Items seeded/updated:", items.length);
 
-   
-    if (process.env.NODE_ENV !== "production") {
-      for (const item of items) {
-        const redisKey = `auction:${item._id}`;
-
-     
-        await redis.del(redisKey);
-
-        await redis.hset(redisKey, {
-          currentBid: item.startingPrice,
-          highestBidderClientId: "",
-          auctionEndTime: Math.floor(
-            new Date(item.auctionEndTime).getTime() / 1000
-          ),
-          ended: "false",
-          persisted: "false",
-        });
-      }
+    
+    for (const item of items) {
+      const redisKey = `auction:${item._id}`;
 
      
-    } else {
-     
-      for (const item of items) {
-        const redisKey = `auction:${item._id}`;
-        const exists = await redis.exists(redisKey);
+      await redis.del(redisKey);
 
-        if (!exists) {
-          await redis.hset(redisKey, {
-            currentBid: item.startingPrice,
-            highestBidderClientId: "",
-            auctionEndTime: Math.floor(
-              new Date(item.auctionEndTime).getTime() / 1000
-            ),
-            ended: "false",
-            persisted: "false",
-          });
-        }
-      }
-
-     
+      
+      await redis.hset(redisKey, {
+        currentBid: item.startingPrice,
+        highestBidderClientId: "",
+        auctionEndTime: Math.floor(
+          new Date(item.auctionEndTime).getTime() / 1000
+        ),
+        ended: "false",
+        persisted: "false",
+      });
     }
 
+    console.log("Redis auction state initialised");
+
+  
     startAuctionFinalizer();
 
+   
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: { origin: "*" },
     });
 
+    
     io.use((socket, next) => {
       const { clientId } = socket.handshake.auth;
       if (!clientId) return next(new Error("clientId required"));
@@ -75,6 +59,7 @@ async function startServer() {
 
     registerBiddingSocket(io);
 
+   
     server.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT}`);
     });
