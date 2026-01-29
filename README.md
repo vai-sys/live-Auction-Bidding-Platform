@@ -48,8 +48,9 @@ Clients sync with server time to render countdown timers, preventing client-side
 ## Run Locally (Backend)
 
 ```bash
-# install deps
+
 npm install
 
-# start server
+
 npm start
+
